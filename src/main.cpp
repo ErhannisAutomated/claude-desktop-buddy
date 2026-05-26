@@ -978,7 +978,7 @@ void setup() {
       spr.drawString("a buddy appears", W/2, H/2 + 12);
     }
     spr.setTextDatum(TL_DATUM); spr.setTextSize(1);
-    spr.pushSprite(0, 0);
+    m5PushBuddy(spr);   // SC01 Plus: scale the 135x240 sprite up
     delay(1800);
   }
 
@@ -1043,7 +1043,7 @@ void loop() {
   // Button-press wake. Track which button woke the screen so its full
   // press cycle (including long-press) is swallowed — you don't want
   // BtnA-to-wake to also cycle displayMode or open the menu.
-  if (M5.BtnA.isPressed() || M5.BtnB.isPressed()) {
+  if (M5.BtnA.isPressed() || M5.BtnB.isPressed() || m5TouchAnyDown()) {
     if (screenOff) {
       if (M5.BtnA.isPressed()) swallowBtnA = true;
       if (M5.BtnB.isPressed()) swallowBtnB = true;
@@ -1162,6 +1162,7 @@ void loop() {
     else applyDisplayMode();
     characterInvalidate();
     if (buddyMode) buddyInvalidate();
+    m5SoftButtonsInvalidate();   // landscape clock fillScreen() wipes the bar
     wasClocking = clocking;
     wasLandscape = landscapeClock;
   }
@@ -1226,7 +1227,8 @@ void loop() {
     if (resetOpen) drawReset();
     else if (settingsOpen) drawSettings();
     else if (menuOpen) drawMenu();
-    spr.pushSprite(0, 0);
+    m5PushBuddy(spr); // WT32-SC01 Plus, scaled push into the top of the panel
+    m5DrawSoftButtons(); // add the on-screen A/B touch targets below it
   }
 
   // Face-down nap: dim immediately, pause animations, accumulate sleep time.

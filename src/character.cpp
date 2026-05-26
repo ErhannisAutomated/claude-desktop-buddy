@@ -24,7 +24,7 @@ static uint8_t   textFrame = 0;
 static uint32_t  textNext = 0;
 
 static bool    loaded = false;
-static Palette pal = { 0xC2A6, 0x0000, 0xFFFF, 0x8410, 0x0000 };
+static Palette pal = { 0xC2A6, 0x0000, 0xFFFF, 0xF79E, 0x0000 };  // textDim #F0F0F0: near-white, legible on dark bg (was #808080)
 static char    basePath[48];
 static const uint8_t MAX_GIFS = 32;
 static char    gifPaths[MAX_GIFS][32];
