@@ -60,7 +60,7 @@ public:
   void SetLDO2(bool on); // screen on/off (restore vs. 0)
   void PowerOff(); // backlight off, wait for tap, restart
   // Faked power telemetry: this board is USB powered with no fuel gauge.
-  float GetBatVoltage() { return 4.15f }
+  float GetBatVoltage() { return 4.15f; }
   float GetBatCurrent() { return 0.0f; }
   float GetVBusVoltage() { return 5.0f; }
   int GetTempInAXP192() { return 25; }
