@@ -1,0 +1,36 @@
+{
+  "_comment": "Merge this into your Claude Code settings.json (~/.claude/settings.json for all projects, or .claude/settings.json in one project). Replace ABSOLUTE_PATH with where this repo lives. Every event points at the same hook.py, which dispatches on the event name.",
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py",
+            "timeout": 35,
+            "statusMessage": "Waiting for the buddy..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
+    "Notification": [
+      { "matcher": "idle_prompt", "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ]
+  }
+}
