@@ -50,7 +50,7 @@
 #define SC01_I2S_SAMPLE_HZ 22050
 // Square-wave amplitude (0..32767). Full scale is painfully loud/harsh through
 // the fixed-gain amp, so beeps run well below it. Bump if too quiet.
-#define SC01_BEEP_AMPLITUDE 8000
+#define SC01_BEEP_AMPLITUDE 16000
 // DMA depth. tone() queues an entire beep at once, so this must exceed the
 // longest beep the firmware plays (200ms) with margin; otherwise the tail would
 // be dropped. 12 x 512 frames @ 22050Hz ~= 278ms.
