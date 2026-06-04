@@ -81,6 +81,21 @@ python3 buddy_bridge.py
    export BUDDY_DECISION_TIMEOUT=30     # seconds to wait for an A/B press
    ```
 
+## Debug logging
+
+Set `BUDDY_LOG` to a file path and every hook invocation appends a timestamped,
+pid-tagged line recording which event fired and what it sent to the device:
+
+```bash
+export BUDDY_LOG=/tmp/buddy-hooks.log
+tail -f /tmp/buddy-hooks.log
+```
+
+Because each hook is a separate process, the pids and millisecond timestamps
+make it possible to see the *ordering* of concurrent hooks — useful for chasing
+cases where one hook's snapshot appears to overwrite another's. Unset the
+variable to turn it off (the default).
+
 ## Try it
 
 With the device plugged in, run `claude` and ask it to do something that needs

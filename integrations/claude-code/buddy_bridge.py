@@ -149,6 +149,26 @@ def send(ser, obj):
         return False
 
 
+def log(event, detail=""):
+    """Append a timestamped line to $BUDDY_LOG, if set. No-op otherwise.
+
+    Off by default. Set BUDDY_LOG=/path/to/file to trace which hook ran when
+    and what it sent — useful for catching ordering/race issues between the
+    stateless hooks (each is a separate process, hence the pid). Never raises.
+    """
+    path = os.environ.get("BUDDY_LOG")
+    if not path:
+        return
+    try:
+        now = time.time()
+        ts = time.strftime("%H:%M:%S", time.localtime(now)) + (".%03d" % (int(now * 1000) % 1000))
+        line = "%s pid=%-7d %-18s %s\n" % (ts, os.getpid(), event, detail)
+        with open(path, "a") as f:
+            f.write(line)
+    except Exception:
+        pass
+
+
 def await_decision(ser, req_id, timeout_s):
     """Block until the device echoes a permission decision for req_id.
 

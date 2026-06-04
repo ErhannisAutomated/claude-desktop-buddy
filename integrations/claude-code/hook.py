@@ -44,9 +44,11 @@ def _send_snapshot(extra):
     with bb.portlock():
         ser = bb.open_port()
         if ser is None:
+            bb.log("send", "NO DEVICE " + json.dumps(extra))
             return
         try:
             bb.send(ser, extra)
+            bb.log("send", json.dumps(extra))
         finally:
             ser.close()
 
@@ -59,6 +61,7 @@ def handle_permission_request(data):
     with bb.portlock():
         ser = bb.open_port()
         if ser is None:
+            bb.log("permission", "NO DEVICE tool=%s" % tool)
             return  # no device -> terminal handles it (emit nothing)
         try:
             bb.send(ser, {
@@ -66,7 +69,9 @@ def handle_permission_request(data):
                 "msg": ("approve: " + tool)[:23],
                 "prompt": {"id": req_id, "tool": tool[:20], "hint": hint[:44]},
             })
+            bb.log("permission.show", "id=%s tool=%s" % (req_id, tool))
             decision = bb.await_decision(ser, req_id, DECISION_TIMEOUT_S)
+            bb.log("permission.result", "id=%s -> %s" % (req_id, decision))
             # Clear the prompt either way so the device leaves the alert state.
             bb.send(ser, {"total": 1, "running": 1, "waiting": 0,
                           "msg": "working"})
@@ -145,7 +150,9 @@ def main():
         data = json.loads(raw) if raw.strip() else {}
     except Exception:
         return  # malformed input: do nothing, exit 0
-    handler = _HANDLERS.get(data.get("hook_event_name"))
+    event = data.get("hook_event_name")
+    bb.log("hook", "%s tool=%s" % (event, data.get("tool_name", "")))
+    handler = _HANDLERS.get(event)
     if handler is None:
         return
     try:
