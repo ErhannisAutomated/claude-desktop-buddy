@@ -969,6 +969,12 @@ void drawHUD() {
 }
 
 void setup() {
+  Serial.begin(115200);
+#if ARDUINO_USB_CDC_ON_BOOT
+  // Serial is USB CDC here (see platformio.ini). Don't let a write block the
+  // main loop when no host has the port open — drop output instead of stalling.
+  Serial.setTxTimeoutMs(0);
+#endif
   M5.begin();
   M5.Lcd.setRotation(0);
   M5.Imu.Init();

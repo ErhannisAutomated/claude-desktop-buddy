@@ -186,3 +186,90 @@ def hint_for(tool_name, tool_input):
         if ti.get(k):
             return str(ti[k])
     return tool_name
+
+
+# --- diagnostics ------------------------------------------------------------
+
+def probe():
+    """Print why the bridge can or can't reach the device. Run directly:
+
+        python3 buddy_bridge.py
+
+    The hooks deliberately fail silently so they never disrupt a session, which
+    makes "nothing happened" hard to debug. This surfaces the real reason.
+    """
+    import errno
+
+    print("pyserial:", "ok" if serial is not None else "MISSING (pip install pyserial)")
+    if serial is None:
+        return 1
+
+    env = os.environ.get("BUDDY_PORT")
+    print("BUDDY_PORT:", env or "(unset, autodetecting)")
+    if list_ports is not None:
+        ports = list(list_ports.comports())
+        print("ports seen:", len(ports))
+        for p in ports:
+            print("  %s  VID:PID=%04X:%04X  %s"
+                  % (p.device, p.vid or 0, p.pid or 0, p.description))
+
+    port = find_port()
+    print("chosen port:", port or "NONE FOUND")
+    if not port:
+        print("=> No device port. Plug in over USB, or set BUDDY_PORT.")
+        return 1
+
+    # Permission check before opening.
+    try:
+        st = os.stat(port)
+        print("perms: %s  (you are uid=%d, groups=%s)"
+              % (oct(st.st_mode & 0o777), os.getuid(), os.getgroups()))
+    except Exception as e:
+        print("stat failed:", e)
+
+    try:
+        ser = serial.Serial()
+        ser.port = port
+        ser.baudrate = BAUD
+        ser.timeout = 0.2
+        ser.dtr = False
+        ser.rts = False
+        ser.open()
+    except Exception as e:
+        msg = str(e)
+        if isinstance(e, OSError) and e.errno == errno.EACCES:
+            msg += "  => permission denied; add yourself to the 'dialout' group: " \
+                   "sudo usermod -aG dialout $USER  (then log out/in)"
+        print("open FAILED:", msg)
+        return 1
+    print("opened:", port)
+
+    # Ask the firmware for a status ack — proves bidirectional USB serial.
+    send(ser, {"cmd": "status"})
+    print("sent {\"cmd\":\"status\"}; listening 3s for any JSON reply...")
+    import time as _t
+    deadline = _t.monotonic() + 3.0
+    buf = b""
+    got = False
+    while _t.monotonic() < deadline:
+        chunk = ser.read(256)
+        if chunk:
+            buf += chunk
+            while b"\n" in buf:
+                line, buf = buf.split(b"\n", 1)
+                line = line.strip()
+                if line:
+                    got = True
+                    print("  <-", line.decode("utf-8", "replace")[:120])
+    ser.close()
+    if not got:
+        print("=> Port opened but the device sent nothing. Most likely the "
+              "firmware's Serial isn't on USB: rebuild/flash with "
+              "ARDUINO_USB_CDC_ON_BOOT=1 (see platformio.ini).")
+        return 1
+    print("=> Bridge looks healthy.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(probe())

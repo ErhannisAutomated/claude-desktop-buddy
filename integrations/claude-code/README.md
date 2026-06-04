@@ -23,6 +23,31 @@ terminal prompt — so the hooks are safe to leave on.
 | `SessionStart` | wake + clock sync (+ owner name) |
 | `SessionEnd` | sleep |
 
+## Prerequisites (read this first)
+
+On the WT32-SC01 Plus the USB-C port is the ESP32-S3's **native USB** (it shows
+up as `/dev/ttyACM*`, "USB JTAG/serial debug unit"). Two things must be true or
+the bridge silently does nothing:
+
+1. **Firmware built with `ARDUINO_USB_CDC_ON_BOOT=1`.** Without it the firmware's
+   `Serial` stays on UART0 (GPIO43/44), which is *not* the USB cable, so nothing
+   gets through. This repo's `platformio.ini` now sets the flag — reflash after
+   pulling: `pio run -t upload`.
+
+2. **Permission to open the port.** `/dev/ttyACM0` is `root:dialout`. Add
+   yourself to the group (once), then log out and back in:
+
+   ```bash
+   sudo usermod -aG dialout $USER
+   ```
+
+When something isn't working, run the **probe** — it reports exactly what's
+wrong (no pyserial, no port, permission denied, or firmware not on USB):
+
+```bash
+python3 buddy_bridge.py
+```
+
 ## Setup
 
 1. **Install pyserial** (the only dependency):
