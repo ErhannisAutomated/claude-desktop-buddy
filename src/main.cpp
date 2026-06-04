@@ -145,6 +145,11 @@ static const Note FANFARE_DONE[] = {
   { NOTE_C5, 90 }, { NOTE_E5, 90 }, { NOTE_G5, 90 }, { NOTE_C6, 170 },
 };
 
+// Two short pips — the "still waiting on you" reminder (settings: reminders).
+static const Note NUDGE[] = {
+  { NOTE_A5, 70 }, { NOTE_REST, 50 }, { NOTE_A5, 70 },
+};
+
 static void sendCmd(const char* json) {
   Serial.println(json);
   size_t n = strlen(json);
@@ -172,8 +177,8 @@ const uint8_t MENU_N = 6;
 
 bool    settingsOpen = false;
 uint8_t settingsSel  = 0;
-const char* settingsItems[] = { "brightness", "sound", "bluetooth", "wifi", "led", "transcript", "clock rot", "ascii pet", "reset", "back" };
-const uint8_t SETTINGS_N = 10;
+const char* settingsItems[] = { "brightness", "sound", "bluetooth", "wifi", "led", "transcript", "keep conn", "reminders", "clock rot", "ascii pet", "reset", "back" };
+const uint8_t SETTINGS_N = 12;
 
 bool    resetOpen = false;
 uint8_t resetSel  = 0;
@@ -200,10 +205,12 @@ static void applySetting(uint8_t idx) {
     case 3: s.wifi = !s.wifi; break;   // stored only — no WiFi stack linked
     case 4: s.led = !s.led; break;
     case 5: s.hud = !s.hud; break;
-    case 6: s.clockRot = (s.clockRot + 1) % 3; break;
-    case 7: nextPet(); return;
-    case 8: resetOpen = true; resetSel = 0; resetConfirmIdx = 0xFF; return;
-    case 9: settingsOpen = false; characterInvalidate(); return;
+    case 6: s.keepConn = !s.keepConn; break;
+    case 7: s.nudge = !s.nudge; break;
+    case 8: s.clockRot = (s.clockRot + 1) % 3; break;
+    case 9: nextPet(); return;
+    case 10: resetOpen = true; resetSel = 0; resetConfirmIdx = 0xFF; return;
+    case 11: settingsOpen = false; characterInvalidate(); return;
   }
   settingsSave();
 }
@@ -289,7 +296,7 @@ static void drawSettings() {
   spr.drawRoundRect(mx, my, mw, mh, 4, p.textDim);
   spr.setTextSize(1);
   Settings& s = settings();
-  bool vals[] = { s.sound, s.bt, s.wifi, s.led, s.hud };
+  bool vals[] = { s.sound, s.bt, s.wifi, s.led, s.hud, s.keepConn, s.nudge };
   for (int i = 0; i < SETTINGS_N; i++) {
     bool sel = (i == settingsSel);
     spr.setTextColor(sel ? p.text : p.textDim, PANEL);
@@ -300,13 +307,13 @@ static void drawSettings() {
     spr.setTextColor(p.textDim, PANEL);
     if (i == 0) {
       spr.printf("%u/4", brightLevel);
-    } else if (i >= 1 && i <= 5) {
+    } else if (i >= 1 && i <= 7) {
       spr.setTextColor(vals[i-1] ? GREEN : p.textDim, PANEL);
       spr.print(vals[i-1] ? " on" : "off");
-    } else if (i == 6) {
+    } else if (i == 8) {
       static const char* const RN[] = { "auto", "port", "land" };
       spr.print(RN[s.clockRot]);
-    } else if (i == 7) {
+    } else if (i == 9) {
       uint8_t total = buddySpeciesCount() + (gifAvailable ? 1 : 0);
       uint8_t pos   = buddyMode ? buddySpeciesIdx() + 1 : total;
       spr.printf("%u/%u", pos, total);
@@ -1089,6 +1096,26 @@ void loop() {
   lastCompleted = tama.recentlyCompleted;
 
   bool inPrompt = tama.promptId[0] && !responseSent;
+
+  // Periodic "still waiting on you" reminder. Fires every 30s while a session
+  // is active but not working — a pending prompt, a just-completed turn, or an
+  // idle session. The triggering event already made its own sound, so the
+  // timer starts on entry and the first reminder lands 30s later. Resets the
+  // moment the waiting state clears (e.g. work resumes or you respond).
+  static uint32_t nudgeSinceMs = 0;
+  bool awaitingUser = tama.connected &&
+    (inPrompt || tama.recentlyCompleted ||
+     (tama.sessionsTotal > 0 && tama.sessionsRunning == 0));
+  if (settings().nudge && awaitingUser) {
+    if (nudgeSinceMs == 0) {
+      nudgeSinceMs = now;               // entered the waiting state
+    } else if (now - nudgeSinceMs >= 30000) {
+      playMelody(NUDGE, MELODY_LEN(NUDGE));
+      nudgeSinceMs = now;
+    }
+  } else {
+    nudgeSinceMs = 0;
+  }
 
   // Button-press wake. Track which button woke the screen so its full
   // press cycle (including long-press) is swallowed — you don't want

@@ -48,7 +48,9 @@ inline void dataSetDemo(bool on) {
 inline bool dataDemo() { return _demoMode; }
 
 inline bool dataConnected() {
-  return _lastLiveMs != 0 && (millis() - _lastLiveMs) <= 30000;
+  if (_lastLiveMs == 0) return false;          // never heard from a host
+  if (settings().keepConn) return true;        // user disabled the 30s timeout
+  return (millis() - _lastLiveMs) <= 30000;
 }
 
 inline bool dataBtActive() {

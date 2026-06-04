@@ -182,10 +182,12 @@ struct Settings {
   bool wifi;     // placeholder — no WiFi stack linked yet, just stores the pref
   bool led;
   bool hud;
+  bool keepConn; // stay "connected" even with no host traffic (no 30s timeout)
+  bool nudge;    // periodic reminder beep while waiting on the user
   uint8_t clockRot;  // 0=auto 1=portrait 2=landscape
 };
 
-static Settings _settings = { true, true, false, true, true, 0 };
+static Settings _settings = { true, true, false, true, true, false, false, 0 };
 
 inline void settingsLoad() {
   _prefs.begin("buddy", true);
@@ -194,6 +196,8 @@ inline void settingsLoad() {
   _settings.wifi  = _prefs.getBool("s_wifi",false);
   _settings.led   = _prefs.getBool("s_led", true);
   _settings.hud      = _prefs.getBool("s_hud", true);
+  _settings.keepConn = _prefs.getBool("s_keepc", false);
+  _settings.nudge    = _prefs.getBool("s_nudge", false);
   _settings.clockRot = _prefs.getUChar("s_crot", 0);
   if (_settings.clockRot > 2) _settings.clockRot = 0;
   _prefs.end();
@@ -206,6 +210,8 @@ inline void settingsSave() {
   _prefs.putBool("s_wifi",_settings.wifi);
   _prefs.putBool("s_led", _settings.led);
   _prefs.putBool("s_hud", _settings.hud);
+  _prefs.putBool("s_keepc", _settings.keepConn);
+  _prefs.putBool("s_nudge", _settings.nudge);
   _prefs.putUChar("s_crot", _settings.clockRot);
   _prefs.end();
 }
