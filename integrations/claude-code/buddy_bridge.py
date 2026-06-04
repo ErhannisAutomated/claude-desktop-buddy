@@ -8,9 +8,13 @@ the thin client the Claude Code hooks use to do that.
 Design notes for the stateless hook model:
   * Each hook invocation opens the port, does its thing, and closes it. A file
     lock serialises concurrent hooks so their writes don't interleave.
-  * Opening a USB-UART normally pulses DTR/RTS, which auto-resets the ESP32.
-    We force both low before opening so the device keeps running across the
-    many short-lived hook processes.
+  * On the ESP32-S3's native USB-Serial/JTAG, a DTR/RTS transition IS the
+    reset signal (it's how esptool reboots into the bootloader). pyserial's
+    Serial.open() drives those lines, AND any tcsetattr() makes the cdc_acm
+    driver toggle DTR -- either reboots the device on every hook. So we do raw
+    file-descriptor I/O with no termios changes, exactly like `echo > port`,
+    which never touches the modem lines. pyserial is still used (when present)
+    only for port autodetection, never for the actual I/O.
   * Nothing here may raise into Claude Code. Callers treat a missing/!asleep
     device as "no decision" and let the terminal handle it. open_port() returns
     None rather than throwing when there's no device.
@@ -19,11 +23,17 @@ Design notes for the stateless hook model:
 import glob
 import json
 import os
+import select
 import sys
 import time
 
 try:
-    import serial  # pyserial
+    import termios  # POSIX raw-fd serial config (Linux/macOS)
+except Exception:  # pragma: no cover - non-POSIX
+    termios = None
+
+try:
+    import serial  # pyserial — used only for port autodetection
     from serial.tools import list_ports
 except Exception:  # pragma: no cover - pyserial not installed
     serial = None
@@ -63,24 +73,68 @@ def find_port():
     return None
 
 
+class _RawPort:
+    """Minimal serial wrapper over a raw fd (write/flush/read/close).
+
+    Deliberately bypasses pyserial so opening never touches DTR/RTS, which on
+    the USB-Serial/JTAG would reset the chip. Mirrors the pyserial method names
+    the rest of this module already uses.
+    """
+
+    def __init__(self, fd):
+        self.fd = fd
+
+    def write(self, data):
+        total = 0
+        while total < len(data):
+            try:
+                n = os.write(self.fd, data[total:])
+            except BlockingIOError:
+                n = 0
+            except OSError:
+                break
+            total += n
+        return total
+
+    def flush(self):
+        try:
+            termios.tcdrain(self.fd)
+        except Exception:
+            pass
+
+    def read(self, n):
+        r, _, _ = select.select([self.fd], [], [], 0.2)  # short poll
+        if not r:
+            return b""
+        try:
+            return os.read(self.fd, n)
+        except (BlockingIOError, OSError):
+            return b""
+
+    def close(self):
+        try:
+            os.close(self.fd)
+        except Exception:
+            pass
+
+
 def open_port(port=None):
-    """Open the device without resetting it. Returns a Serial or None."""
-    if serial is None:
-        return None
+    """Open the device without resetting it. Returns a _RawPort or None.
+
+    Crucially we do NOT call tcsetattr(): changing termios makes the cdc_acm
+    driver toggle DTR, which on the USB-Serial/JTAG reboots the chip. The
+    default line settings are fine for raw byte I/O over USB CDC (baud/parity
+    are meaningless there). This mirrors `echo > /dev/ttyACM0`, which doesn't
+    reset. O_NONBLOCK keeps open() from blocking on carrier-detect.
+    """
     port = port or find_port()
     if not port:
         return None
     try:
-        ser = serial.Serial()
-        ser.port = port
-        ser.baudrate = BAUD
-        ser.timeout = 0.2          # short read timeout; we poll in a loop
-        ser.dtr = False            # hold reset lines low so the ESP32 keeps
-        ser.rts = False            # running across repeated hook opens
-        ser.open()
-        return ser
+        fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
     except Exception:
         return None
+    return _RawPort(fd)
 
 
 def send(ser, obj):
@@ -227,21 +281,17 @@ def probe():
     except Exception as e:
         print("stat failed:", e)
 
+    # Raw open (same path the hooks use) so the probe doesn't reset the chip.
     try:
-        ser = serial.Serial()
-        ser.port = port
-        ser.baudrate = BAUD
-        ser.timeout = 0.2
-        ser.dtr = False
-        ser.rts = False
-        ser.open()
-    except Exception as e:
+        fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+    except OSError as e:
         msg = str(e)
-        if isinstance(e, OSError) and e.errno == errno.EACCES:
+        if e.errno == errno.EACCES:
             msg += "  => permission denied; add yourself to the 'dialout' group: " \
                    "sudo usermod -aG dialout $USER  (then log out/in)"
         print("open FAILED:", msg)
         return 1
+    ser = _RawPort(fd)
     print("opened:", port)
 
     # Ask the firmware for a status ack — proves bidirectional USB serial.
