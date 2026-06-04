@@ -46,6 +46,7 @@ bool    menuOpen    = false;
 uint8_t menuSel     = 0;
 uint8_t brightLevel = 4;           // 0..4 → ScreenBreath 20..100
 bool    btnALong    = false;
+bool    btnBLong    = false;
 
 enum DisplayMode { DISP_NORMAL, DISP_PET, DISP_INFO, DISP_COUNT };
 uint8_t displayMode = DISP_NORMAL;
@@ -60,6 +61,8 @@ bool     dimmed = false;
 bool     screenOff = false;
 bool     swallowBtnA = false;
 bool     swallowBtnB = false;
+bool     nudgeSilenced = false;   // B-long mutes reminders until the state changes
+uint32_t nudgeSinceMs  = 0;       // millis the current waiting state began (0=none)
 bool     buddyMode = false;
 bool     gifAvailable = false;
 const uint8_t SPECIES_GIF = 0xFF;   // species NVS sentinel: use the installed GIF
@@ -1074,6 +1077,7 @@ void loop() {
     if (tama.promptId[0]) {
       promptArrivedMs = millis();
       wake();
+      nudgeSilenced = false; nudgeSinceMs = 0;  // new prompt: re-arm reminders
       beep(1200, 80);   // alert chirp
       // Jump to the approval screen no matter what was open — drawApproval
       // only runs from drawHUD which only runs in DISP_NORMAL.
@@ -1091,6 +1095,7 @@ void loop() {
   static bool lastCompleted = false;
   if (tama.recentlyCompleted && !lastCompleted) {
     wake();
+    nudgeSilenced = false; nudgeSinceMs = 0;  // fresh completion: re-arm reminders
     playMelody(FANFARE_DONE, MELODY_LEN(FANFARE_DONE));
   }
   lastCompleted = tama.recentlyCompleted;
@@ -1100,21 +1105,22 @@ void loop() {
   // Periodic "still waiting on you" reminder. Fires every 30s while a session
   // is active but not working — a pending prompt, a just-completed turn, or an
   // idle session. The triggering event already made its own sound, so the
-  // timer starts on entry and the first reminder lands 30s later. Resets the
-  // moment the waiting state clears (e.g. work resumes or you respond).
-  static uint32_t nudgeSinceMs = 0;
+  // timer starts on entry and the first reminder lands 30s later. B-long mutes
+  // it (nudgeSilenced) until the state changes; the prompt-arrival and
+  // completion edges above lift the mute and restart the timer.
   bool awaitingUser = tama.connected &&
     (inPrompt || tama.recentlyCompleted ||
      (tama.sessionsTotal > 0 && tama.sessionsRunning == 0));
   if (settings().nudge && awaitingUser) {
     if (nudgeSinceMs == 0) {
       nudgeSinceMs = now;               // entered the waiting state
-    } else if (now - nudgeSinceMs >= 30000) {
+    } else if (!nudgeSilenced && now - nudgeSinceMs >= 30000) {
       playMelody(NUDGE, MELODY_LEN(NUDGE));
       nudgeSinceMs = now;
     }
   } else {
     nudgeSinceMs = 0;
+    nudgeSilenced = false;              // waiting ended → reminders armed again
   }
 
   // Button-press wake. Track which button woke the screen so its full
@@ -1182,37 +1188,48 @@ void loop() {
     swallowBtnA = false;
   }
 
-  // BtnB: pet → heart
-  if (M5.BtnB.wasPressed()) {
-    if (swallowBtnB) { swallowBtnB = false; }
-    else
-    if (inPrompt) {
-      char cmd[96];
-      snprintf(cmd, sizeof(cmd), "{\"cmd\":\"permission\",\"id\":\"%s\",\"decision\":\"deny\"}", tama.promptId);
-      sendCmd(cmd);
-      responseSent = true;
-      statsOnDenial();
-      beep(600, 60);
-    } else if (resetOpen) {
-      beep(2400, 30);
-      applyReset(resetSel);
-    } else if (settingsOpen) {
-      beep(2400, 30);
-      applySetting(settingsSel);
-    } else if (menuOpen) {
-      beep(2400, 30);
-      menuConfirm();
-    } else if (displayMode == DISP_INFO) {
-      beep(2400, 30);
-      infoPage = (infoPage + 1) % INFO_PAGES;
-    } else if (displayMode == DISP_PET) {
-      beep(2400, 30);
-      petPage = (petPage + 1) % PET_PAGES;
-      applyDisplayMode();
-    } else {
-      beep(2400, 30);
-      msgScroll = (msgScroll >= 30) ? 0 : msgScroll + 1;
+  // BtnB long-press: mute the periodic reminders until the state next changes.
+  // Like BtnA, the tap action fires on release so a long hold doesn't also
+  // trigger it (e.g. accidentally deny a prompt).
+  if (M5.BtnB.pressedFor(600) && !btnBLong && !swallowBtnB) {
+    btnBLong = true;
+    beep(800, 60);
+    nudgeSilenced = true;
+    Serial.println("reminders silenced");
+  }
+  // BtnB tap: confirm / deny / pet → heart
+  if (M5.BtnB.wasReleased()) {
+    if (!btnBLong && !swallowBtnB) {
+      if (inPrompt) {
+        char cmd[96];
+        snprintf(cmd, sizeof(cmd), "{\"cmd\":\"permission\",\"id\":\"%s\",\"decision\":\"deny\"}", tama.promptId);
+        sendCmd(cmd);
+        responseSent = true;
+        statsOnDenial();
+        beep(600, 60);
+      } else if (resetOpen) {
+        beep(2400, 30);
+        applyReset(resetSel);
+      } else if (settingsOpen) {
+        beep(2400, 30);
+        applySetting(settingsSel);
+      } else if (menuOpen) {
+        beep(2400, 30);
+        menuConfirm();
+      } else if (displayMode == DISP_INFO) {
+        beep(2400, 30);
+        infoPage = (infoPage + 1) % INFO_PAGES;
+      } else if (displayMode == DISP_PET) {
+        beep(2400, 30);
+        petPage = (petPage + 1) % PET_PAGES;
+        applyDisplayMode();
+      } else {
+        beep(2400, 30);
+        msgScroll = (msgScroll >= 30) ? 0 : msgScroll + 1;
+      }
     }
+    btnBLong = false;
+    swallowBtnB = false;
   }
 
   // blink bookkeeping

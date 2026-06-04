@@ -109,9 +109,14 @@ bottom bar: **A** on the left, **B** on the right:
 | **A** (left zone)  | next screen          | next screen | next screen | **approve** |
 | **B** (right zone)   | scroll transcript    | next page   | next page   | **deny**    |
 | **Long-press A**    | menu                 | menu        | menu        | menu        |
+| **Long-press B**    | silence reminders    | silence     | silence     | silence     |
 
 Tap anywhere to wake the screen. The screen auto-powers-off after 30s of no
 interaction (kept on while an approval prompt is up).
+
+**Long-press B** mutes the periodic reminder (Settings → reminders) until the
+state next changes — handy when you've seen a prompt and want it to stop pinging
+while you finish something else.
 
 > **No IMU on this board**, so the shake-to-dizzy, face-down nap, and clock
 > auto-rotate inputs are dormant. The `dizzy`/`heart`/nap *states* still trigger
