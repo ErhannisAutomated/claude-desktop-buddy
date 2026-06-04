@@ -4,6 +4,7 @@
 #include "ble_bridge.h"
 #include "data.h"
 #include "buddy.h"
+#include "notes.h"
 
 TFT_eSprite spr = TFT_eSprite(&M5.Lcd);
 
@@ -111,6 +112,38 @@ bool     responseSent = false;
 static void beep(uint16_t freq, uint16_t dur) {
   if (settings().sound) M5.Beep.tone(freq, dur);
 }
+
+// Non-blocking melody sequencer (see notes.h). Holds the current melody and
+// advances one note per elapsed duration from melodyUpdate(); each note is
+// played through beep(), so it follows the sound setting and the board's
+// speaker/buzzer just like any other chirp.
+static const Note* melody       = nullptr;
+static uint8_t     melodyCount  = 0;
+static uint8_t     melodyIdx    = 0;
+static uint32_t    melodyNextMs = 0;
+
+static void melodyPlayNote(uint8_t i) {
+  if (melody[i].freq != NOTE_REST) beep(melody[i].freq, melody[i].durMs);
+  melodyNextMs = millis() + melody[i].durMs;   // rests just hold silence
+}
+
+void playMelody(const Note* notes, uint8_t count) {
+  if (!notes || count == 0) return;
+  melody = notes; melodyCount = count; melodyIdx = 0;
+  melodyPlayNote(0);
+}
+
+void melodyUpdate() {
+  if (!melody) return;
+  if ((int32_t)(millis() - melodyNextMs) < 0) return;   // current note still ringing
+  if (++melodyIdx >= melodyCount) { melody = nullptr; return; }
+  melodyPlayNote(melodyIdx);
+}
+
+// Rising major arpeggio — a little "task done" flourish.
+static const Note FANFARE_DONE[] = {
+  { NOTE_C5, 90 }, { NOTE_E5, 90 }, { NOTE_G5, 90 }, { NOTE_C6, 170 },
+};
 
 static void sendCmd(const char* json) {
   Serial.println(json);
@@ -988,6 +1021,7 @@ void setup() {
 void loop() {
   M5.update();
   M5.Beep.update();
+  melodyUpdate();
   t++;
   uint32_t now = millis();
 
@@ -1037,6 +1071,16 @@ void loop() {
       if (buddyMode) buddyInvalidate();
     }
   }
+
+  // Response finished, control back to you: play a fanfare on the rising edge
+  // of the completion flag (the prompt beep above only fires for permission
+  // requests, not for a session wrapping up).
+  static bool lastCompleted = false;
+  if (tama.recentlyCompleted && !lastCompleted) {
+    wake();
+    playMelody(FANFARE_DONE, MELODY_LEN(FANFARE_DONE));
+  }
+  lastCompleted = tama.recentlyCompleted;
 
   bool inPrompt = tama.promptId[0] && !responseSent;
 
