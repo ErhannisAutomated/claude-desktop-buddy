@@ -144,6 +144,22 @@ void ShimBeep::begin() {
 void ShimBeep::tone(uint16_t freq, uint16_t durMs) {
   if (!_inited || freq == 0 || durMs == 0) return;
 
+  const int toneFrames = (int)((uint32_t)SC01_I2S_SAMPLE_HZ * durMs / 1000);
+
+  // ~2ms attack/release. A bare square wave snaps from 0 to full amplitude at
+  // the start and stops mid-cycle at the end; those steps are audible clicks
+  // (the "crackle"). Ramping the envelope over a couple of ms removes them.
+  int ramp = SC01_I2S_SAMPLE_HZ / 500;        // 2ms in frames
+  if (ramp > toneFrames / 2) ramp = toneFrames / 2;
+  if (ramp < 1) ramp = 1;
+
+  // The I2S engine always clocks out whole DMA buffers (SC01_I2S_DMA_LEN frames),
+  // so round the write up to a buffer boundary and fill the remainder with
+  // silence. Otherwise the unwritten tail of the last buffer plays stale samples
+  // after the beep. The padding is at most one buffer (~23ms) inside our budget.
+  int totalFrames = ((toneFrames + SC01_I2S_DMA_LEN - 1) / SC01_I2S_DMA_LEN)
+                    * SC01_I2S_DMA_LEN;
+
   // Whole beep, generated and queued at once. Write non-blocking (timeout 0):
   // the DMA is sized to hold the longest beep, so right after a quiet stretch
   // all of it fits. If a beep ever overruns the buffer, the tail is simply
@@ -153,21 +169,26 @@ void ShimBeep::tone(uint16_t freq, uint16_t durMs) {
   const float inc = (float)freq / (float)SC01_I2S_SAMPLE_HZ;
   float phase = 0.0f;
 
-  int remaining = (int)((uint32_t)SC01_I2S_SAMPLE_HZ * durMs / 1000);  // frames
-  while (remaining > 0) {
-    int n = remaining < FRAMES ? remaining : FRAMES;
-    for (int i = 0; i < n; i++) {
-      int16_t s = (phase < 0.5f) ? (int16_t)SC01_BEEP_AMPLITUDE
-                                 : (int16_t)-SC01_BEEP_AMPLITUDE;
+  int gf = 0;                               // global frame index across chunks
+  while (gf < totalFrames) {
+    int n = (totalFrames - gf) < FRAMES ? (totalFrames - gf) : FRAMES;
+    for (int i = 0; i < n; i++, gf++) {
+      int16_t s = 0;                        // padding region is silence
+      if (gf < toneFrames) {
+        int base = (phase < 0.5f) ? SC01_BEEP_AMPLITUDE : -SC01_BEEP_AMPLITUDE;
+        int env = 256;                      // 8.8 fixed-point gain, 256 = unity
+        if (gf < ramp)                      env = gf * 256 / ramp;
+        else if (gf >= toneFrames - ramp)   env = (toneFrames - gf) * 256 / ramp;
+        s = (int16_t)(base * env / 256);
+        phase += inc;
+        if (phase >= 1.0f) phase -= 1.0f;
+      }
       buf[2 * i]     = s;
       buf[2 * i + 1] = s;
-      phase += inc;
-      if (phase >= 1.0f) phase -= 1.0f;
     }
     size_t written = 0;
     i2s_write(BEEP_I2S_PORT, buf, n * 2 * sizeof(int16_t), &written, 0);
     if (written < (size_t)(n * 2 * sizeof(int16_t))) break;  // DMA full; drop tail
-    remaining -= n;
   }
 }
 
