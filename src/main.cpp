@@ -1083,10 +1083,15 @@ void loop() {
       // only runs from drawHUD which only runs in DISP_NORMAL.
       displayMode = DISP_NORMAL;
       menuOpen = settingsOpen = resetOpen = false;
-      applyDisplayMode();
-      characterInvalidate();
-      if (buddyMode) buddyInvalidate();
     }
+    // Whenever the prompt changes (arrives, clears, or swaps), wipe the sprite.
+    // drawApproval() paints the bottom ~third (y H-78..H) but drawHUD only
+    // clears the transcript strip (y H-28..H), so without this the panel ghosts
+    // once the prompt is gone — same leftover problem applyDisplayMode() already
+    // solves for the info/pet screens.
+    applyDisplayMode();
+    characterInvalidate();
+    if (buddyMode) buddyInvalidate();
   }
 
   // Response finished, control back to you: play a fanfare on the rising edge
