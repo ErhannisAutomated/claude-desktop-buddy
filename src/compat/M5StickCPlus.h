@@ -76,12 +76,20 @@ public:
   void getAccelData(float* ax, float* ay, float* az) { *ax = 0; *ay = 0; *az = 1.0f; }
 };
 
-// No buzzer
+// Buzzer replacement: synthesises the M5StickC Plus's tones as a square wave
+// played through the SC01 Plus's onboard I2S amplifier/speaker. Same shape as
+// the real M5.Beep API: begin() once, tone() to fire a chirp, update() each loop
+// (a no-op here). tone() generates the WHOLE beep up front and hands it to the
+// I2S DMA, so the chirp plays to completion on its own regardless of how often
+// loop()/update() runs — important because loop() drops to ~10Hz with the screen
+// off, which is slower than a short beep. See m5shim.cpp for the buffer sizing.
 class ShimBeep {
 public:
-  void begin() {}
+  void begin();
   void update() {}
-  void tone(uint16_t /*freq*/, uint16_t /*durMs*/) {}
+  void tone(uint16_t freq, uint16_t durMs);
+private:
+  bool _inited = false;
 };
 
 // Software RTC taken from by {"time":[epoch,tz]} from the desktop

@@ -37,3 +37,22 @@
 #define SC01_SPR_CY 213
 
 #define SC01_LONGPRESS_MS 600
+
+// Speaker (onboard I2S amplifier).
+// The SC01 Plus drives a small speaker through an I2S amp on these pins. The
+// M5StickC Plus original used a passive buzzer via M5.Beep.tone(); here that
+// shim synthesises the same chirps as a square wave streamed over I2S. Pins
+// match the WT32-SC01 Plus wiring (same ones Lumia-ESP32 uses for playback).
+#define SC01_I2S_PORT      0
+#define SC01_I2S_BCLK_PIN  36
+#define SC01_I2S_LRCK_PIN  35
+#define SC01_I2S_DOUT_PIN  37
+#define SC01_I2S_SAMPLE_HZ 22050
+// Square-wave amplitude (0..32767). Full scale is painfully loud/harsh through
+// the fixed-gain amp, so beeps run well below it. Bump if too quiet.
+#define SC01_BEEP_AMPLITUDE 8000
+// DMA depth. tone() queues an entire beep at once, so this must exceed the
+// longest beep the firmware plays (200ms) with margin; otherwise the tail would
+// be dropped. 12 x 512 frames @ 22050Hz ~= 278ms.
+#define SC01_I2S_DMA_COUNT 12
+#define SC01_I2S_DMA_LEN   512

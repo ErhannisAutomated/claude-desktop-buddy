@@ -3,6 +3,7 @@
 #include <M5StickCPlus.h> // resolves to ../compat/M5StickCPlus.h (shim)
 #include <Wire.h>
 #include <time.h>
+#include <driver/i2s.h>   // legacy I2S driver (Arduino-ESP32 core 2.0.x / IDF 4.4)
 
 M5Shim M5;
 
@@ -96,6 +97,78 @@ void ShimAxp::PowerOff() {
   uint16_t x, y;
   while (!readTouch(x, y)) delay(50);
   ESP.restart();
+}
+
+// Speaker / buzzer (I2S)
+//
+// The M5StickC Plus had a passive buzzer. The SC01 Plus instead has an I2S amp
+// driving a small speaker, so we synthesise the same short chirps as a square
+// wave and play them out. tone() generates the ENTIRE beep and writes it into
+// the I2S DMA in one shot (non-blocking): the DMA then clocks it out on its own,
+// so the beep plays to completion no matter how slowly loop()/update() runs.
+// That matters because the main loop drops to ~10Hz with the screen off, slower
+// than the beep itself. The DMA is sized (see sc01_config.h) to hold the longest
+// beep the firmware uses, so the whole tone always fits and update() does
+// nothing. tx_desc_auto_clear makes the DMA fall back to silence once the beep
+// has clocked out, rather than looping stale samples.
+#define BEEP_I2S_PORT ((i2s_port_t)SC01_I2S_PORT)
+
+void ShimBeep::begin() {
+  if (_inited) return;
+
+  i2s_config_t cfg = {};
+  cfg.mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX);
+  cfg.sample_rate          = SC01_I2S_SAMPLE_HZ;
+  cfg.bits_per_sample      = I2S_BITS_PER_SAMPLE_16BIT;
+  cfg.channel_format       = I2S_CHANNEL_FMT_RIGHT_LEFT;   // stereo, same on both
+  cfg.communication_format = I2S_COMM_FORMAT_STAND_I2S;
+  cfg.intr_alloc_flags     = 0;
+  cfg.dma_buf_count        = SC01_I2S_DMA_COUNT;
+  cfg.dma_buf_len          = SC01_I2S_DMA_LEN;
+  cfg.use_apll             = false;
+  cfg.tx_desc_auto_clear   = true;    // emit silence (not stale data) on underrun
+
+  i2s_pin_config_t pins = {};
+  pins.mck_io_num   = I2S_PIN_NO_CHANGE;
+  pins.bck_io_num   = SC01_I2S_BCLK_PIN;
+  pins.ws_io_num    = SC01_I2S_LRCK_PIN;
+  pins.data_out_num = SC01_I2S_DOUT_PIN;
+  pins.data_in_num  = I2S_PIN_NO_CHANGE;
+
+  if (i2s_driver_install(BEEP_I2S_PORT, &cfg, 0, NULL) != ESP_OK) return;
+  i2s_set_pin(BEEP_I2S_PORT, &pins);
+  i2s_zero_dma_buffer(BEEP_I2S_PORT);
+  _inited = true;
+}
+
+void ShimBeep::tone(uint16_t freq, uint16_t durMs) {
+  if (!_inited || freq == 0 || durMs == 0) return;
+
+  // Whole beep, generated and queued at once. Write non-blocking (timeout 0):
+  // the DMA is sized to hold the longest beep, so right after a quiet stretch
+  // all of it fits. If a beep ever overruns the buffer, the tail is simply
+  // dropped instead of stalling the main loop.
+  const int FRAMES = 128;
+  int16_t buf[FRAMES * 2];                  // interleaved L/R
+  const float inc = (float)freq / (float)SC01_I2S_SAMPLE_HZ;
+  float phase = 0.0f;
+
+  int remaining = (int)((uint32_t)SC01_I2S_SAMPLE_HZ * durMs / 1000);  // frames
+  while (remaining > 0) {
+    int n = remaining < FRAMES ? remaining : FRAMES;
+    for (int i = 0; i < n; i++) {
+      int16_t s = (phase < 0.5f) ? (int16_t)SC01_BEEP_AMPLITUDE
+                                 : (int16_t)-SC01_BEEP_AMPLITUDE;
+      buf[2 * i]     = s;
+      buf[2 * i + 1] = s;
+      phase += inc;
+      if (phase >= 1.0f) phase -= 1.0f;
+    }
+    size_t written = 0;
+    i2s_write(BEEP_I2S_PORT, buf, n * 2 * sizeof(int16_t), &written, 0);
+    if (written < (size_t)(n * 2 * sizeof(int16_t))) break;  // DMA full; drop tail
+    remaining -= n;
+  }
 }
 
 // Software RTC
