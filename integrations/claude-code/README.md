@@ -96,6 +96,33 @@ make it possible to see the *ordering* of concurrent hooks — useful for chasin
 cases where one hook's snapshot appears to overwrite another's. Unset the
 variable to turn it off (the default).
 
+### Trace *every* event (`log_only.py`)
+
+To see the full picture — every event Claude Code emits, in order, regardless of
+whether `hook.py` acts on it — enable the observability-only logger. It writes to
+the **same** `$BUDDY_LOG` file, so terminal events and device actions interleave
+into one timeline.
+
+`log_only.py` is stdlib-only and never opens the serial port (it can't touch or
+reset the device); it only ever appends a line. To enable it, merge
+`settings.logging.example.json` into your settings *alongside* the normal
+`settings.example.json` (replace `ABSOLUTE_PATH`, set `$BUDDY_LOG`). It registers
+the logger under all ~29 documented hook events and dumps each event's full raw
+payload, so an event that carries more fields than documented — or one we forgot
+about — is still captured verbatim.
+
+A few events are chatty (e.g. `MessageDisplay` can fire many times per response).
+Mute them without losing the rest:
+
+```bash
+export BUDDY_LOG_EXCLUDE=MessageDisplay,FileChanged
+```
+
+In the merged log, lines from the logger are tagged `EVT:<EventName>` (the raw
+terminal event), while `hook.py`'s own lines use lowercase verbs (`hook`,
+`send`, `permission.show`, `permission.result`) — so you can tell at a glance
+what the terminal emitted versus what the device was told to do.
+
 ## Try it
 
 With the device plugged in, run `claude` and ask it to do something that needs

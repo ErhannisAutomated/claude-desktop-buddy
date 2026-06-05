@@ -1,0 +1,303 @@
+{
+  "_comment": "OBSERVABILITY ONLY. Merge into your Claude Code settings.json to log EVERY hook event to $BUDDY_LOG via log_only.py, which touches nothing (no device I/O). Use ALONGSIDE settings.example.json to compare terminal event order against device actions in one timeline. Replace ABSOLUTE_PATH. Set $BUDDY_LOG to a file to enable; unset = no-op. Mute chatty events with BUDDY_LOG_EXCLUDE=MessageDisplay,FileChanged. There is no wildcard event name, so every event is listed explicitly; events Claude Code adds later must be added here too.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "CwdChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ABSOLUTE_PATH/integrations/claude-code/log_only.py"
+          }
+        ]
+      }
+    ]
+  }
+}
