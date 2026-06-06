@@ -49,6 +49,7 @@ def _send_snapshot(extra):
         try:
             bb.send(ser, extra)
             bb.log("send", json.dumps(extra))
+            bb.read_acks(ser, bb.ack_read_window())  # debug firmware only; no-op otherwise
         finally:
             ser.close()
 
@@ -75,6 +76,7 @@ def handle_permission_request(data):
             # Clear the prompt either way so the device leaves the alert state.
             bb.send(ser, {"total": 1, "running": 1, "waiting": 0,
                           "msg": "working"})
+            bb.read_acks(ser, bb.ack_read_window())  # capture the clear's ack too
         finally:
             ser.close()
 

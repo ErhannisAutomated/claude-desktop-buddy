@@ -123,6 +123,41 @@ terminal event), while `hook.py`'s own lines use lowercase verbs (`hook`,
 `send`, `permission.show`, `permission.result`) — so you can tell at a glance
 what the terminal emitted versus what the device was told to do.
 
+### Device-side acks (what the device actually received and did)
+
+The logs above prove what the *host sent*. They can't tell whether the device
+received a line, parsed it, or chose to chirp — so a missing notification could
+be a dropped serial line *or* the firmware not beeping, and you can't tell which.
+Debug firmware closes that gap.
+
+Build and flash the **debug** firmware env, which echoes a JSON ack out USB
+serial at the points that matter (off in normal builds; see `src/dbg.h`):
+
+```bash
+pio run -e wt32-sc01-plus-debug -t upload
+```
+
+It emits:
+
+| Ack | When | Means |
+|---|---|---|
+| `{"ack":"state",...}` | every snapshot it parses & applies | the device **received** it (includes the resulting `prompt` id and counts) |
+| `{"ack":"parse","ok":false}` | a line it couldn't parse | the line arrived **garbled/partial** and was dropped |
+| `{"ack":"beep","kind":"prompt",...}` | the prompt chirp fires | the device actually **beeped** |
+
+Then tell the host to listen for them after each send:
+
+```bash
+export BUDDY_ACK_READ=1      # 0.3s listen window; or a number of seconds
+```
+
+These land in `$BUDDY_LOG` tagged `dev`, interleaved with the `send`/`EVT:`
+lines. Reading a missing-beep incident top to bottom now separates the three
+failure modes: no `permission.show` (host never sent) → a `send` with no `dev
+state` ack (device dropped it) → a `dev state` ack with the prompt set but no
+`dev beep` (device got it but didn't chirp). `BUDDY_ACK_READ` is off by default
+and a no-op against normal firmware, so leave it unset outside an investigation.
+
 ## Try it
 
 With the device plugged in, run `claude` and ask it to do something that needs

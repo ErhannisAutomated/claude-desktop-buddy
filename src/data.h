@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include "ble_bridge.h"
 #include "xfer.h"
+#include "dbg.h"
 
 struct TamaState {
   uint8_t  sessionsTotal;
@@ -71,7 +72,10 @@ inline bool dataRtcValid() { return _rtcValid; }
 
 static void _applyJson(const char* line, TamaState* out) {
   JsonDocument doc;
-  if (deserializeJson(doc, line)) return;
+  if (deserializeJson(doc, line)) {
+    DBG_ACK("{\"ack\":\"parse\",\"ok\":false}\n");  // line arrived garbled/partial
+    return;
+  }
   if (xferCommand(doc)) { _lastLiveMs = millis(); return; }
 
   // Bridge sends {"time":[epoch_sec, tz_offset_sec]}; gmtime_r on the
@@ -126,6 +130,13 @@ static void _applyJson(const char* line, TamaState* out) {
   }
   out->lastUpdated = millis();
   _lastLiveMs = millis();
+
+  // One ack per applied snapshot. Because feed() drains every buffered line in
+  // a single dataPoll, a set-then-clear pair shows up as two acks here before
+  // the beep edge runs once — exactly the collapse we're hunting for.
+  DBG_ACK("{\"ack\":\"state\",\"prompt\":\"%s\",\"tot\":%u,\"run\":%u,\"wait\":%u,\"done\":%u}\n",
+          out->promptId, out->sessionsTotal, out->sessionsRunning,
+          out->sessionsWaiting, (unsigned)out->recentlyCompleted);
 }
 
 template<size_t N>

@@ -1079,6 +1079,7 @@ void loop() {
       wake();
       nudgeSilenced = false; nudgeSinceMs = 0;  // new prompt: re-arm reminders
       beep(1200, 80);   // alert chirp
+      DBG_ACK("{\"ack\":\"beep\",\"kind\":\"prompt\",\"prompt\":\"%s\"}\n", tama.promptId);
       // Jump to the approval screen no matter what was open — drawApproval
       // only runs from drawHUD which only runs in DISP_NORMAL.
       displayMode = DISP_NORMAL;

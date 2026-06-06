@@ -173,7 +173,10 @@ def await_decision(ser, req_id, timeout_s):
     """Block until the device echoes a permission decision for req_id.
 
     Returns "once", "deny", or None on timeout. The device prints non-JSON
-    debug lines too, so we only parse lines that start with '{'.
+    debug lines too, so we only parse lines that start with '{'. Any other JSON
+    line seen while waiting (e.g. an {"ack":...} from debug firmware) is logged
+    to $BUDDY_LOG so device receipts/beeps land in the trace next to the
+    permission flow.
     """
     if ser is None:
         return None
@@ -197,7 +200,52 @@ def await_decision(ser, req_id, timeout_s):
                     continue
                 if msg.get("cmd") == "permission" and msg.get("id") == req_id:
                     return msg.get("decision")
+                log("dev", line.decode("utf-8", "replace")[:200])
     return None
+
+
+def ack_read_window():
+    """Seconds to listen for device acks after a snapshot, from $BUDDY_ACK_READ.
+
+    Disabled by default (returns 0) so normal hooks stay fire-and-forget. Set
+    BUDDY_ACK_READ=1 (=> 0.3s) when running the debug firmware to capture the
+    device's {"ack":...} lines; a numeric value overrides the window length.
+    """
+    v = os.environ.get("BUDDY_ACK_READ", "").strip().lower()
+    if not v or v in ("0", "false", "no", "off"):
+        return 0.0
+    if v in ("1", "true", "yes", "on"):
+        return 0.3
+    try:
+        return max(0.0, float(v))
+    except ValueError:
+        return 0.3
+
+
+def read_acks(ser, dur_s):
+    """Drain and log any JSON line the device emits for dur_s seconds.
+
+    Only meaningful against debug firmware (-DBUDDY_DEBUG_ACK), which echoes
+    {"ack":...} lines. Each is logged via log("dev", ...) so device receipts and
+    chirps interleave with the host's own send lines in $BUDDY_LOG. Never raises.
+    """
+    if ser is None or dur_s <= 0:
+        return
+    deadline = time.monotonic() + dur_s
+    buf = b""
+    while time.monotonic() < deadline:
+        try:
+            chunk = ser.read(256)
+        except Exception:
+            return
+        if not chunk:
+            continue
+        buf += chunk
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            line = line.strip()
+            if line.startswith(b"{"):
+                log("dev", line.decode("utf-8", "replace")[:200])
 
 
 # --- file lock so concurrent hooks don't garble the serial stream -----------
