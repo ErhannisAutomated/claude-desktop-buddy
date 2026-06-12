@@ -70,6 +70,11 @@ inline const char* dataScenarioName() {
 static bool _rtcValid = false;
 inline bool dataRtcValid() { return _rtcValid; }
 
+// Applied-snapshot counter: bumped once per successfully applied state snapshot
+// (not on cmd/time lines, not on parse failures). Shown on the debug HUD and
+// echoed as "seq" in the state ack, so the number on screen maps to the log.
+static uint32_t msgSeq = 0;
+
 static void _applyJson(const char* line, TamaState* out) {
   JsonDocument doc;
   DeserializationError _derr = deserializeJson(doc, line);
@@ -141,12 +146,13 @@ static void _applyJson(const char* line, TamaState* out) {
   }
   out->lastUpdated = millis();
   _lastLiveMs = millis();
+  msgSeq++;   // advance the applied-snapshot counter (HUD + ack correlation)
 
   // One ack per applied snapshot. Because feed() drains every buffered line in
   // a single dataPoll, a set-then-clear pair shows up as two acks here before
   // the beep edge runs once — exactly the collapse we're hunting for.
-  DBG_ACK("{\"ack\":\"state\",\"prompt\":\"%s\",\"tot\":%u,\"run\":%u,\"wait\":%u,\"done\":%u,\"heap\":%u,\"max\":%u}\n",
-          out->promptId, out->sessionsTotal, out->sessionsRunning,
+  DBG_ACK("{\"ack\":\"state\",\"seq\":%u,\"prompt\":\"%s\",\"tot\":%u,\"run\":%u,\"wait\":%u,\"done\":%u,\"heap\":%u,\"max\":%u}\n",
+          (unsigned)msgSeq, out->promptId, out->sessionsTotal, out->sessionsRunning,
           out->sessionsWaiting, (unsigned)out->recentlyCompleted,
           (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 }

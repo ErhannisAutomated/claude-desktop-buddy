@@ -930,6 +930,31 @@ void drawPet() {
   spr.printf("%u/%u", petPage + 1, PET_PAGES);
 }
 
+#ifdef BUDDY_DEBUG_ACK
+// Debug HUD: a one-line strip across the very top of the sprite — current state
+// (last msg) on the left, the applied-snapshot counter (#seq) on the right. The
+// seq matches the "seq" field in the state ack and the host log, so you can read
+// the buddy's last-received id off the screen and correlate it: a frozen #seq
+// while a terminal prompt is up means that prompt's line never landed. The
+// counter only advances on applied snapshots, so it freezes the moment the
+// device stops accepting updates. Debug builds only.
+static void drawDebugLine() {
+  spr.fillRect(0, 0, W, 9, 0x0000);
+  spr.setTextSize(1);
+  spr.setTextDatum(TL_DATUM);
+  char st[18];
+  snprintf(st, sizeof(st), "%.17s", tama.msg[0] ? tama.msg : (tama.connected ? "idle" : "-"));
+  spr.setTextColor(0xFFFF, 0x0000);
+  spr.setCursor(1, 1); spr.print(st);
+  char sq[12];
+  int n = snprintf(sq, sizeof(sq), "#%lu", (unsigned long)msgSeq);
+  spr.setTextColor(0xFFE0, 0x0000);   // yellow
+  spr.setCursor(W - n * 6 - 1, 1); spr.print(sq);
+}
+#else
+static inline void drawDebugLine() {}
+#endif
+
 void drawHUD() {
   if (tama.promptId[0]) { drawApproval(); return; }
   const Palette& p = characterPalette();
@@ -1327,6 +1352,8 @@ void loop() {
     if (resetOpen) drawReset();
     else if (settingsOpen) drawSettings();
     else if (menuOpen) drawMenu();
+    if (displayMode == DISP_NORMAL && !resetOpen && !settingsOpen && !menuOpen)
+      drawDebugLine();  // debug-only top strip: state + applied-seq (no-op in normal builds)
     m5PushBuddy(spr); // WT32-SC01 Plus, scaled push into the top of the panel
     m5DrawSoftButtons(); // add the on-screen A/B touch targets below it
   }
