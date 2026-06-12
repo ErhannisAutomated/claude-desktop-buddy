@@ -72,10 +72,18 @@ def handle_permission_request(data):
             bb.log("permission.show", "id=%s tool=%s" % (req_id, tool))
             decision = bb.await_decision(ser, req_id, DECISION_TIMEOUT_S)
             bb.log("permission.result", "id=%s -> %s" % (req_id, decision))
-            # Clear the prompt either way so the device leaves the alert state.
-            bb.send(ser, {"total": 1, "running": 1, "waiting": 0,
-                          "msg": "working"})
-            bb.read_acks(ser, bb.ack_read_window())  # capture the clear's ack too
+            if decision is None:
+                # Timed out waiting for an A/B press — the terminal prompt may
+                # STILL be open. Claiming "working" here is a lie that flips the
+                # device out of its waiting state and silences the reminder pip.
+                # Stay truthfully "waiting"; the next real activity moves it on.
+                bb.send(ser, {"total": 1, "running": 0, "waiting": 1,
+                              "msg": "waiting"})
+            else:
+                # Answered on the device -> Claude proceeds; clear the alert.
+                bb.send(ser, {"total": 1, "running": 1, "waiting": 0,
+                              "msg": "working"})
+            bb.read_acks(ser, bb.ack_read_window())
         finally:
             ser.close()
 
@@ -120,8 +128,12 @@ def handle_pre_tool_use(data):
 
 
 def handle_notification(data):
-    # permission_prompt is handled by PermissionRequest; here we cover the
-    # "Claude is waiting on you" idle case as an attention nudge.
+    # A permission_prompt notification is already driven by the PermissionRequest
+    # hook; sending our own prompt-less "waiting" here CLOBBERS that prompt off
+    # the device mid-decision. Only handle the idle case ("Claude is waiting on
+    # your input"), where there's no prompt to clobber.
+    if data.get("notification_type") == "permission_prompt":
+        return
     _send_snapshot({"total": 1, "running": 0, "waiting": 1, "msg": "waiting"})
 
 
