@@ -26,6 +26,9 @@
     "PreToolUse": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
     ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
+    ],
     "Notification": [
       { "matcher": "idle_prompt", "hooks": [ { "type": "command", "command": "python3 ABSOLUTE_PATH/integrations/claude-code/hook.py" } ] }
     ],

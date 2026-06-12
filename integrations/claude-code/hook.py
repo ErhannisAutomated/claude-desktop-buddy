@@ -72,18 +72,17 @@ def handle_permission_request(data):
             bb.log("permission.show", "id=%s tool=%s" % (req_id, tool))
             decision = bb.await_decision(ser, req_id, DECISION_TIMEOUT_S)
             bb.log("permission.result", "id=%s -> %s" % (req_id, decision))
-            if decision is None:
-                # Timed out waiting for an A/B press — the terminal prompt may
-                # STILL be open. Claiming "working" here is a lie that flips the
-                # device out of its waiting state and silences the reminder pip.
-                # Stay truthfully "waiting"; the next real activity moves it on.
-                bb.send(ser, {"total": 1, "running": 0, "waiting": 1,
-                              "msg": "waiting"})
-            else:
+            if decision is not None:
                 # Answered on the device -> Claude proceeds; clear the alert.
                 bb.send(ser, {"total": 1, "running": 1, "waiting": 0,
                               "msg": "working"})
-            bb.read_acks(ser, bb.ack_read_window())
+                bb.read_acks(ser, bb.ack_read_window())
+            # On timeout (None) send NOTHING. The prompt is still pending and (no
+            # longer clobbered) still showing on the device, so let it stand —
+            # the firmware keeps reminding off that prompt. A late "waiting"/
+            # "working" here would just stomp the real outcome; PostToolUse (the
+            # approved tool running) or the next activity moves the device on
+            # once the prompt is actually answered in the terminal.
         finally:
             ser.close()
 
@@ -127,6 +126,15 @@ def handle_pre_tool_use(data):
                     "msg": ("run: " + tool)[:23], "entries": [entry]})
 
 
+def handle_post_tool_use(data):
+    # A tool finished -> Claude is working again, not waiting on you. This is
+    # also our proxy for "the permission prompt was answered in the terminal":
+    # the approved tool ran, so this clears a lingering prompt/waiting that the
+    # blocking PermissionRequest hook can't clear itself (no terminal-answer hook
+    # exists). Fires after every tool, which is fine — it just reasserts working.
+    _send_snapshot({"total": 1, "running": 1, "waiting": 0, "msg": "working"})
+
+
 def handle_notification(data):
     # A permission_prompt notification is already driven by the PermissionRequest
     # hook; sending our own prompt-less "waiting" here CLOBBERS that prompt off
@@ -151,6 +159,7 @@ _HANDLERS = {
     "SessionStart": handle_session_start,
     "UserPromptSubmit": handle_user_prompt_submit,
     "PreToolUse": handle_pre_tool_use,
+    "PostToolUse": handle_post_tool_use,
     "Notification": handle_notification,
     "Stop": handle_stop,
     "SessionEnd": handle_session_end,
