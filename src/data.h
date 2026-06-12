@@ -79,8 +79,12 @@ static void _applyJson(const char* line, TamaState* out) {
     // len is the buffered length, head is the first 60 bytes verbatim so we
     // can see the actual corruption. (head may contain quotes — it's a debug
     // line read by eye, not strict JSON.)
-    DBG_ACK("{\"ack\":\"parse\",\"ok\":false,\"err\":\"%s\",\"len\":%u,\"head\":\"%.60s\"}\n",
-            _derr.c_str(), (unsigned)strlen(line), line);
+    // heap = total free; max = largest allocatable block. A NoMemory with high
+    // heap but low max is fragmentation; both low is exhaustion; neither low
+    // (so err is InvalidInput/IncompleteInput) points at wire corruption.
+    DBG_ACK("{\"ack\":\"parse\",\"ok\":false,\"err\":\"%s\",\"len\":%u,\"heap\":%u,\"max\":%u,\"head\":\"%.60s\"}\n",
+            _derr.c_str(), (unsigned)strlen(line),
+            (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(), line);
     return;
   }
   if (xferCommand(doc)) { _lastLiveMs = millis(); return; }
@@ -141,9 +145,10 @@ static void _applyJson(const char* line, TamaState* out) {
   // One ack per applied snapshot. Because feed() drains every buffered line in
   // a single dataPoll, a set-then-clear pair shows up as two acks here before
   // the beep edge runs once — exactly the collapse we're hunting for.
-  DBG_ACK("{\"ack\":\"state\",\"prompt\":\"%s\",\"tot\":%u,\"run\":%u,\"wait\":%u,\"done\":%u}\n",
+  DBG_ACK("{\"ack\":\"state\",\"prompt\":\"%s\",\"tot\":%u,\"run\":%u,\"wait\":%u,\"done\":%u,\"heap\":%u,\"max\":%u}\n",
           out->promptId, out->sessionsTotal, out->sessionsRunning,
-          out->sessionsWaiting, (unsigned)out->recentlyCompleted);
+          out->sessionsWaiting, (unsigned)out->recentlyCompleted,
+          (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
 }
 
 template<size_t N>

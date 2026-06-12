@@ -117,17 +117,17 @@ inline bool xferCommand(JsonDocument& doc) {
     int vBus = (int)(M5.Axp.GetVBusVoltage() * 1000);
     int pct = (vBat - 3200) / 10;
     if (pct < 0) pct = 0; if (pct > 100) pct = 100;
-    char b[320];
+    char b[384];
     int len = snprintf(b, sizeof(b),
       "{\"ack\":\"status\",\"ok\":true,\"n\":0,\"data\":{"
       "\"name\":\"%s\",\"owner\":\"%s\",\"sec\":%s,"
       "\"bat\":{\"pct\":%d,\"mV\":%d,\"mA\":%d,\"usb\":%s},"
-      "\"sys\":{\"up\":%lu,\"heap\":%u,\"fsFree\":%lu,\"fsTotal\":%lu},"
+      "\"sys\":{\"up\":%lu,\"heap\":%u,\"max\":%u,\"fsFree\":%lu,\"fsTotal\":%lu},"
       "\"stats\":{\"appr\":%u,\"deny\":%u,\"vel\":%u,\"nap\":%lu,\"lvl\":%u}"
       "}}\n",
       petName(), ownerName(), bleSecure() ? "true" : "false",
       pct, vBat, iBat, (vBus > 4000) ? "true" : "false",
-      millis() / 1000, ESP.getFreeHeap(),
+      millis() / 1000, ESP.getFreeHeap(), ESP.getMaxAllocHeap(),
       (unsigned long)(LittleFS.totalBytes() - LittleFS.usedBytes()),
       (unsigned long)LittleFS.totalBytes(),
       stats().approvals, stats().denials, statsMedianVelocity(),
