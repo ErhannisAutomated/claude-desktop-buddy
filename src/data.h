@@ -72,8 +72,15 @@ inline bool dataRtcValid() { return _rtcValid; }
 
 static void _applyJson(const char* line, TamaState* out) {
   JsonDocument doc;
-  if (deserializeJson(doc, line)) {
-    DBG_ACK("{\"ack\":\"parse\",\"ok\":false}\n");  // line arrived garbled/partial
+  DeserializationError _derr = deserializeJson(doc, line);
+  if (_derr) {
+    // Report WHY: err is ArduinoJson's reason (InvalidInput=garbage bytes,
+    // IncompleteInput=truncated/split line, NoMemory=heap exhausted, etc.),
+    // len is the buffered length, head is the first 60 bytes verbatim so we
+    // can see the actual corruption. (head may contain quotes — it's a debug
+    // line read by eye, not strict JSON.)
+    DBG_ACK("{\"ack\":\"parse\",\"ok\":false,\"err\":\"%s\",\"len\":%u,\"head\":\"%.60s\"}\n",
+            _derr.c_str(), (unsigned)strlen(line), line);
     return;
   }
   if (xferCommand(doc)) { _lastLiveMs = millis(); return; }
