@@ -47,8 +47,7 @@ def _send_snapshot(extra):
             bb.log("send", "NO DEVICE " + json.dumps(extra))
             return
         try:
-            bb.send(ser, extra)
-            bb.log("send", json.dumps(extra))
+            bb.send(ser, extra)  # logs the wire line itself (tag "send")
             bb.read_acks(ser, bb.ack_read_window())  # debug firmware only; no-op otherwise
         finally:
             ser.close()

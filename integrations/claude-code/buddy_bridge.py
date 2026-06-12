@@ -138,15 +138,25 @@ def open_port(port=None):
 
 
 def send(ser, obj):
-    """Write one JSON line. Swallows errors (device may have vanished)."""
+    """Write one JSON line. Swallows errors (device may have vanished).
+
+    Logs the payload to $BUDDY_LOG (tag "send") here, centrally, so every
+    host->device line is recorded exactly once and no caller can forget — the
+    permission path's clear/clobber sends used to be invisible. Callers still
+    add their own *semantic* lines (permission.show, etc.); this only covers the
+    wire.
+    """
     if ser is None:
         return False
+    line = json.dumps(obj, separators=(",", ":"))
     try:
-        ser.write((json.dumps(obj, separators=(",", ":")) + "\n").encode("utf-8"))
+        ser.write((line + "\n").encode("utf-8"))
         ser.flush()
-        return True
     except Exception:
+        log("send", "FAILED " + line)
         return False
+    log("send", line)
+    return True
 
 
 def log(event, detail=""):
