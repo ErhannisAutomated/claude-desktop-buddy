@@ -210,7 +210,7 @@ def await_decision(ser, req_id, timeout_s):
                     continue
                 if msg.get("cmd") == "permission" and msg.get("id") == req_id:
                     return msg.get("decision")
-                log("dev", line.decode("utf-8", "replace")[:200])
+                log("dev", line.decode("utf-8", "replace")[:480])
     return None
 
 
@@ -255,7 +255,7 @@ def read_acks(ser, dur_s):
             line, buf = buf.split(b"\n", 1)
             line = line.strip()
             if line.startswith(b"{"):
-                log("dev", line.decode("utf-8", "replace")[:200])
+                log("dev", line.decode("utf-8", "replace")[:480])
 
 
 # --- file lock so concurrent hooks don't garble the serial stream -----------
@@ -388,7 +388,7 @@ def probe():
                 line = line.strip()
                 if line:
                     got = True
-                    print("  <-", line.decode("utf-8", "replace")[:120])
+                    print("  <-", line.decode("utf-8", "replace")[:480])
     ser.close()
     if not got:
         print("=> Port opened but the device sent nothing. Most likely the "
